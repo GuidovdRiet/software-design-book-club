@@ -676,10 +676,10 @@ const steps = React.useMemo(
 ## Key Takeaways for Our Codebase
 
 ### What We Did Wrong (Tactical Programming)
-1. **Quick jQuery Integration**: Used events to bridge React and legacy code
-2. **Monolithic Contexts**: Put everything in one place for immediate functionality
-3. **Manual Schema Building**: Built validation schemas outside components
-4. **Temporal Coupling**: Required specific initialization order without enforcement
+1. **Quick jQuery Integration**: Used events to bridge React and legacy code - but ofc we need this to make things work and move on fast
+3. **Monolithic Contexts**: Put everything in one place for immediate functionality
+4. **Manual Schema Building**: Built validation schemas outside components
+5. **Temporal Coupling**: Required specific initialization order without enforcement
 
 ### What Strategic Programming Looks Like
 1. **Deep Modules**: Simple interfaces that hide complex implementations

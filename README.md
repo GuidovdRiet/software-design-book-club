@@ -1,5 +1,4 @@
 # Dev Book Club: A Philosophy of Software Design
-**Prepared by Guido – Chainels Frontend Engineer**
 
 ---
 ## 1. Warm-up (10 min)

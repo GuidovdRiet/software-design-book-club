@@ -123,10 +123,7 @@ He argues — and I agree — that comments are essential for explaining non-obv
 > "Well-written comments are not failures. They increase the value of code."
 
 ### Q: Do we want to do a follow-up or experiment with something from the book?
-**A:** Yes. Let's prototype a version of the booking flow built strategically:
-- No jQuery
-- No manual schema glue
-- Fully declarative via context and hooks
+**A:** Yes. Let's prototype a version of the booking flow built strategically.
 
 ---
 

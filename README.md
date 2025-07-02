@@ -88,7 +88,7 @@ However, the payoff for good design comes quickly. A tactical approach won't eve
 → `DynamicForm`, `useMultiStepForm`, (future) `useBookingFlow()`
 
 ### Shallow: large surface, little benefit
-→ `capitalizeFirstLetter()`, or hooks that require manual `init()` steps
+→ `capitalizeFirstLetter()`
 
 ### From Chapter 4:
 > "One of the most important techniques for managing software complexity is to design systems so that developers only need to face a small fraction of the overall complexity at any given time."

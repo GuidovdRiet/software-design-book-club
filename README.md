@@ -1,8 +1,8 @@
-# 🧠 Dev Book Club: A Philosophy of Software Design
+# Dev Book Club: A Philosophy of Software Design
 **Prepared by Guido – Chainels Frontend Engineer**
 
 ---
-## 🔹 1. Warm-up (10 min)
+## 1. Warm-up (10 min)
 
 ### Q: What's one idea or chapter that stood out to you?
 
@@ -20,9 +20,9 @@
 
 ---
 
-## 🔹 2. Main Discussion (60 min)
+## 2. Main Discussion (60 min)
 
-## 🧩 Complexity is the Enemy
+## Complexity is the Enemy
 Complexity makes code harder to understand and modify.
 
 ### In our codebase, that's `BookingModal.tsx`, which coordinates:
@@ -38,7 +38,7 @@ Changing one part often touches 3–5 files. That's **Change Amplification**.
 
 ---
 
-## 🧠 Cognitive Load
+## Cognitive Load
 Devs need to juggle: multi-step forms, dynamic validations, legacy events, translations, etc.
 
 A new dev touching booking has to learn: `useMultiStepForm`, `DynamicForm`, Yup schemas, jQuery events, and slot availability logic.
@@ -47,7 +47,7 @@ Each part is manageable — but the aggregate is where the cost lies.
 
 ---
 
-## ❓ Unknown Unknowns
+## Unknown Unknowns
 Legacy systems wired by events (`chn:legacy:booking:modal:open`) have no type contracts or clear ordering.
 
 If you forget to dispatch an event or the DOM hasn't rendered, it silently fails.
@@ -56,7 +56,7 @@ React can't help you here — that's where unknown unknowns bite.
 
 ---
 
-## 🎯 Tactical vs. Strategic Programming
+## Tactical vs. Strategic Programming
 
 ### Tactical: "Let's just wire it up and move on."
 ### Strategic: "Let's build something we won't regret in 6 months."
@@ -83,7 +83,7 @@ However, the payoff for good design comes quickly. A tactical approach won't eve
 
 ---
 
-## 📦 Deep vs. Shallow Modules
+## Deep vs. Shallow Modules
 
 ### Deep: small surface, hides complexity
 → `DynamicForm`, `useMultiStepForm`, (future) `useBookingFlow()`
@@ -99,7 +99,7 @@ However, the payoff for good design comes quickly. A tactical approach won't eve
 
 ---
 
-## 🕰️ Temporal Coupling
+## Temporal Coupling
 **Legacy example:**
 ```javascript
 $(document).on('chn:legacy:booking:modal:open', handleModalOpen);
@@ -111,7 +111,7 @@ Hidden dependencies between event order and DOM structure are fragile.
 
 ---
 
-## 🔹 3. Wrap-up (15–20 min)
+## 3. Wrap-up (15–20 min)
 
 ### Q: What's one idea you want to apply or think more about?
 **A:** Consolidate booking logic into a deep module (`useBookingFlow`). Reduce friction points by collapsing steps into one managed context and replace DOM events with state-driven flows.
@@ -130,7 +130,7 @@ He argues — and I agree — that comments are essential for explaining non-obv
 
 ---
 
-## 🔹 Codebase Examples (Referenced in Discussion)
+## Codebase Examples (Referenced in Discussion)
 
 ### Change Amplification
 
@@ -208,7 +208,7 @@ function handleModalOpen() {
 
 ---
 
-## 📋 Additional Code Examples: Our Codebase Through the Lens of "A Philosophy of Software Design"
+## Additional Code Examples: Our Codebase Through the Lens of "A Philosophy of Software Design"
 
 ### 1. Change Amplification Examples
 
@@ -676,7 +676,7 @@ const steps = React.useMemo(
 
 ---
 
-## 🎯 Key Takeaways for Our Codebase
+## Key Takeaways for Our Codebase
 
 ### What We Did Wrong (Tactical Programming)
 1. **Quick jQuery Integration**: Used events to bridge React and legacy code

@@ -697,3 +697,360 @@ const steps = React.useMemo(
 - **Maintainability**: Easier to onboard new developers
 - **Reliability**: Fewer bugs and easier debugging
 
+
+# Put it into practise. SurveyFormFlow Refactoring: From Shallow to Deep Module
+**Applying "A Philosophy of Software Design" Principles**
+
+## The Problem: Current SurveyFormFlow Component and Booking Component
+
+### High Cognitive Load
+The current `SurveyFormFlow.tsx` (490 lines) requires developers to understand multiple concerns simultaneously:
+
+```typescript
+// Current: Too many responsibilities in one component
+function SurveyFormFlow({ message, showState, setShowSurveyResultsModal }) {
+  // 1. Form validation schema generation
+  const getSurveyQuestionValidationSchema = React.useCallback((question) => {
+    switch (question.question_type) {
+      case SurveyQuestionTypes.OPEN:
+        return getOpenSurveyQuestionSchema(question, t);
+      case SurveyQuestionTypes.SINGLE:
+        return getSingleChoiceSurveyQuestionSchema(question, t);
+      // ... 3 more cases
+    }
+  }, [t]);
+
+  // 2. Multi-step form management
+  const { currentStep, currentStepCount, formik, handleBack, maxSteps, isLastStep, isFirstStep, setCurrentStepCount } = useMultiStepForm({...});
+
+  // 3. API submission logic with complex transformations
+  const onSubmit = React.useCallback(async (values) => {
+    const answers = await Promise.all(
+      Object.entries(values).map(async ([questionId, value]) => {
+        let apiAnswerObject;
+        switch (value.answer_type) {
+          case SurveyAnswerTypes.RATING:
+            // Complex rating transformation
+          case SurveyAnswerTypes.UPLOAD:
+            // File upload logic
+          case SurveyAnswerTypes.MULTI:
+            // Multi-choice transformation
+          default:
+            // Default transformation
+        }
+        return { /* complex object */ };
+      })
+    );
+    // More submission logic...
+  }, [many, dependencies]);
+
+  // 4. Privacy warning logic
+  const shouldShowPrivacyWarning = account?.visibility === 'private' && survey.user_type === 'account' && survey.results_public === true && isFirstStep;
+
+  // 5. Dirty form handling
+  useDirtyFormConfirmPrompt(formik.dirty);
+
+  // 6. UI rendering with complex conditional logic
+  return (
+    <SurveyFormModal>
+      <MultiStepFormWrapper>
+        {/* Complex conditional rendering */}
+      </MultiStepFormWrapper>
+    </SurveyFormModal>
+  );
+}
+```
+
+### Change Amplification
+To modify survey behavior, you must touch:
+1. **SurveyFormFlow.tsx** - Main component logic
+2. **Multiple question schema files** - Validation logic
+3. **Multiple initial value files** - Form setup logic
+4. **API functions** - Submission logic
+5. **Translation files** - UI text
+6. **Type definitions** - Data structures
+
+### Unknown Unknowns
+- Hidden dependencies between form validation and question types
+- Complex data transformation logic mixed with component logic
+- File upload logic embedded in submission flow
+- Privacy warning logic scattered throughout component
+
+## The Solution: Deep Module Architecture
+
+### 1. Create Focused Feature Module Structure
+
+```
+features/surveys/
+├── components/
+│   ├── SurveyFlow.tsx          # Simple interface component
+│   ├── SurveyFormModal.tsx     # Modal wrapper
+│   └── SurveyQuestion.tsx      # Individual question component
+├── hooks/
+│   ├── useSurveyFlow.ts        # Main survey logic
+│   ├── useSurveyFormSetup.ts   # Form initialization
+│   ├── useSurveySubmission.ts  # API submission logic
+│   ├── useSurveyValidation.ts  # Validation schema generation
+│   └── useSurveyPrivacy.ts     # Privacy warning logic
+├── types/
+│   ├── survey.types.ts         # All survey-related types
+│   └── answers.types.ts        # Answer type definitions
+├── utils/
+│   ├── answerTransformers.ts   # Data transformation logic
+│   └── questionHelpers.ts      # Question-specific utilities
+└── index.ts                    # Public API
+```
+
+### 2. Deep Module: useSurveyFlow Hook
+
+```typescript
+// features/surveys/hooks/useSurveyFlow.ts
+export function useSurveyFlow(message: SurveyMessage) {
+  const { steps, initialValues } = useSurveyFormSetup(message);
+  const { submitSurvey, isSubmitting } = useSurveySubmission(message);
+  const { shouldShowPrivacyWarning } = useSurveyPrivacy(message);
+  
+  const formFlow = useMultiStepForm({
+    steps,
+    initialValues,
+    onSubmit: submitSurvey,
+  });
+  
+  return {
+    // Simple interface - hides all complexity
+    formFlow,
+    shouldShowPrivacyWarning,
+    isSubmitting,
+  };
+}
+```
+
+### 3. Focused Hook: useSurveyFormSetup
+
+```typescript
+// features/surveys/hooks/useSurveyFormSetup.ts
+export function useSurveyFormSetup(message: SurveyMessage) {
+  const { t } = useTranslation();
+  const query = useSurveySubmissionQuery(message);
+  
+  const steps = React.useMemo(() => {
+    return message.survey.questions.map((question) => ({
+      component: <SurveyFormQuestion question={question} />,
+      validationSchema: getQuestionValidationSchema(question, t),
+    }));
+  }, [message.survey.questions, t]);
+  
+  const initialValues = React.useMemo(() => {
+    return message.survey.questions.reduce((acc, question) => {
+      acc[question.id] = getQuestionInitialValue(question, query.data);
+      return acc;
+    }, {} as SurveyFormAnswers);
+  }, [message.survey.questions, query.data]);
+  
+  return { steps, initialValues };
+}
+```
+
+### 4. Focused Hook: useSurveySubmission
+
+```typescript
+// features/surveys/hooks/useSurveySubmission.ts
+export function useSurveySubmission(message: SurveyMessage) {
+  const queryClient = useQueryClient();
+  
+  const { mutateAsync: submitAnswers, isPending: isSubmitting } = useMutation({
+    mutationFn: async (values: SurveyFormAnswers) => {
+      const answers = await transformAnswersForAPI(values, message.in_group_id);
+      
+      if (message.survey.submission_id) {
+        return editSurveyAnswers(message.id, message.survey.submission_id, answers);
+      }
+      
+      return submitSurveyAnswers(message.id, answers);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages', message.id] });
+    },
+  });
+  
+  return { submitSurvey: submitAnswers, isSubmitting };
+}
+```
+
+### 5. Utility: Answer Transformers
+
+```typescript
+// features/surveys/utils/answerTransformers.ts
+export async function transformAnswersForAPI(
+  values: SurveyFormAnswers,
+  groupId: string
+): Promise<SurveyFormAnswer[]> {
+  return Promise.all(
+    Object.entries(values).map(async ([questionId, value]) => {
+      const transformer = getAnswerTransformer(value.answer_type);
+      const apiAnswerObject = await transformer(value, groupId);
+      
+      return {
+        question_id: questionId,
+        answer_type: value.answer_type,
+        other_option_value: value.other_option_value,
+        ...apiAnswerObject,
+      };
+    })
+  );
+}
+
+function getAnswerTransformer(answerType: SURVEY_ANSWER_TYPES) {
+  switch (answerType) {
+    case SurveyAnswerTypes.RATING:
+      return transformRatingAnswer;
+    case SurveyAnswerTypes.UPLOAD:
+      return transformUploadAnswer;
+    case SurveyAnswerTypes.MULTI:
+      return transformMultiChoiceAnswer;
+    default:
+      return transformDefaultAnswer;
+  }
+}
+```
+
+### 6. Deep Module: SurveyFlow Component
+
+```typescript
+// features/surveys/components/SurveyFlow.tsx
+export function SurveyFlow({ 
+  message, 
+  showState, 
+  setShowSurveyResultsModal 
+}: SurveyFlowProps) {
+  const { formFlow, shouldShowPrivacyWarning, isSubmitting } = useSurveyFlow(message);
+  
+  // Simple interface - complex implementation hidden
+  return (
+    <SurveyFormModal showState={showState}>
+      <MultiStepFormWrapper
+        formik={formFlow.formik}
+        currentStep={
+          <>
+            {shouldShowPrivacyWarning && <PrivacyWarning />}
+            {formFlow.currentStep.component}
+          </>
+        }
+        header={
+          <MultiStepFormProgressHeader
+            title={message.title}
+            currentStepCount={formFlow.currentStepCount}
+            maxSteps={formFlow.maxSteps}
+          />
+        }
+        footer={
+          <SurveyFormFooter
+            formFlow={formFlow}
+            isSubmitting={isSubmitting}
+            onClose={showState.setShow}
+          />
+        }
+      />
+      <SurveySubmissionConfirmationModal
+        message={message}
+        setShowSurveyResultsModal={setShowSurveyResultsModal}
+      />
+    </SurveyFormModal>
+  );
+}
+```
+
+### 7. Public API
+
+```typescript
+// features/surveys/index.ts
+export { SurveyFlow } from './components/SurveyFlow';
+export { useSurveyFlow } from './hooks/useSurveyFlow';
+export type { SurveyMessage, SurveyFormAnswers } from './types/survey.types';
+
+// Usage: Simple and focused
+import { SurveyFlow } from '@/features/surveys';
+
+<SurveyFlow 
+  message={message}
+  showState={{ show, setShow }}
+  setShowSurveyResultsModal={setShowSurveyResultsModal}
+/>
+```
+
+## Benefits of the Refactored Architecture
+
+### 1. Reduced Cognitive Load
+**Before**: Developer must understand 6+ concerns in one file
+**After**: Developer only needs to understand the specific hook they're working on
+
+### 2. Eliminated Change Amplification
+**Before**: Survey changes touch 6+ files across different concerns
+**After**: Survey changes are contained within the `features/surveys/` module
+
+### 3. Deep Modules
+- **SurveyFlow**: Simple interface (`message`, `showState`, `setShowSurveyResultsModal`)
+- **useSurveyFlow**: Hides all complex survey logic behind simple return object
+- **Answer Transformers**: Encapsulate complex data transformation logic
+
+### 4. Information Hiding
+- File upload logic hidden in `transformUploadAnswer`
+- Validation schema generation hidden in `useSurveyFormSetup`
+- Privacy warning logic hidden in `useSurveyPrivacy`
+
+### 5. Single Responsibility
+- Each hook handles one specific concern
+- Each utility function has one clear purpose
+- Components focus on rendering, not business logic
+
+## Migration Strategy
+
+### Phase 1: Extract Hooks (Week 1)
+1. Create `features/surveys/` directory structure
+2. Extract `useSurveyFormSetup` hook
+3. Extract `useSurveySubmission` hook
+4. Extract `useSurveyPrivacy` hook
+
+### Phase 2: Create Utilities (Week 2)
+1. Create `answerTransformers.ts` utility
+2. Create `questionHelpers.ts` utility
+3. Move types to dedicated type files
+
+### Phase 3: Refactor Component (Week 3)
+1. Create new `SurveyFlow` component
+2. Update imports to use new module structure
+3. Remove old `SurveyFormFlow.tsx`
+
+### Phase 4: Testing & Documentation (Week 4)
+1. Write unit tests for each hook
+2. Write integration tests for the module
+3. Document the new API
+
+## Success Metrics
+
+### Development Velocity
+- **Change Amplification**: Survey changes touch 1-2 files instead of 6+
+- **Cognitive Load**: New developers understand survey logic in hours instead of days
+- **Unknown Unknowns**: Clear module boundaries eliminate hidden dependencies
+
+### Code Quality
+- **Module Depth**: Simple interfaces with complex implementations hidden
+- **Information Hiding**: No implementation details leaked to consumers
+- **Single Responsibility**: Each module has one clear purpose
+
+### Team Productivity
+- **Onboarding**: New developers can work on surveys faster
+- **Feature Development**: Survey features require fewer file changes
+- **Bug Resolution**: Survey issues are contained within the module
+
+## Conclusion
+
+This refactoring transforms a **shallow module** (complex interface, mixed responsibilities) into **deep modules** (simple interfaces, focused responsibilities) that follow the principles from "A Philosophy of Software Design":
+
+1. **Deep Modules**: Simple interfaces that hide complex implementations
+2. **Information Hiding**: Implementation details are encapsulated within modules
+3. **Reduced Complexity**: Developers only face a small fraction of complexity at any time
+4. **Strategic Programming**: Investment in good design pays off in long-term productivity
+
+The result is a survey system that's easier to understand, modify, and maintain, with clear boundaries and reduced coupling between different parts of the system.
+
